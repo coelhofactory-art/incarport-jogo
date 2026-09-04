@@ -6,12 +6,13 @@
 <style>
 :root{
   --bg:#0B0D0E;
-  --panel:#14181A;
+  --panel:#15191B;
+  --line:rgba(237,233,226,.14);
   --cream:#EDE9E2;
   --muted:#8D9498;
   --accent:#E0362B;
+  --gold:#E8B93C;
   --win:#37C97D;
-  --near:#F0A93B;
   --display:"Archivo","Helvetica Neue",Arial,sans-serif;
   --body:"Inter","Helvetica Neue",Arial,sans-serif;
 }
@@ -24,65 +25,108 @@ body{
 }
 #app{
   position:fixed; inset:0; display:flex; flex-direction:column;
-  padding:max(18px,env(safe-area-inset-top)) 20px max(18px,env(safe-area-inset-bottom));
+  padding:max(14px,env(safe-area-inset-top)) 18px max(14px,env(safe-area-inset-bottom));
 }
 
 /* ---------- topo ---------- */
-.bar{ display:flex; align-items:center; justify-content:space-between; flex:0 0 auto; }
+.bar{ display:flex; align-items:center; justify-content:space-between;
+      flex:0 0 auto; gap:12px; }
 .wm{
   font-family:var(--display); font-style:italic; font-weight:900;
-  font-size:clamp(19px,5vw,26px); letter-spacing:-.03em;
+  font-size:clamp(17px,4.6vw,23px); letter-spacing:-.03em;
 }
 .wm span{ color:var(--accent); }
-.best{
-  font-size:clamp(10px,2.6vw,12px); font-weight:700; letter-spacing:.14em;
-  text-transform:uppercase; color:var(--muted); text-align:right; line-height:1.4;
+.tabs{ display:flex; gap:6px; }
+.tab{
+  font:inherit; font-size:clamp(10px,2.7vw,12px); font-weight:700;
+  letter-spacing:.1em; text-transform:uppercase; color:var(--muted);
+  background:none; border:1px solid var(--line); border-radius:999px;
+  padding:7px 13px; cursor:pointer;
 }
-.best b{ display:block; color:var(--cream); font-family:var(--display);
-         font-size:clamp(14px,3.6vw,18px); letter-spacing:-.01em;
-         font-variant-numeric:tabular-nums; }
+.tab[aria-pressed="true"]{ color:var(--bg); background:var(--cream); border-color:var(--cream); }
+.tab:focus-visible{ outline:2px solid var(--cream); outline-offset:2px; }
 
 /* ---------- palco ---------- */
 .stage{
   flex:1; display:flex; flex-direction:column; align-items:center;
-  justify-content:center; text-align:center; min-height:0; gap:clamp(6px,1.6vh,14px);
+  justify-content:center; text-align:center; min-height:0; gap:clamp(5px,1.4vh,12px);
 }
 .target{
-  font-size:clamp(12px,3.2vw,15px); font-weight:700; letter-spacing:.2em;
+  font-size:clamp(11px,3vw,14px); font-weight:700; letter-spacing:.18em;
   text-transform:uppercase; color:var(--muted);
 }
 .target b{ color:var(--accent); }
 
 .num{
   font-family:var(--display); font-style:italic; font-weight:900;
-  font-size:clamp(64px,20vw,150px); line-height:.9; letter-spacing:-.045em;
+  font-size:clamp(56px,18vw,132px); line-height:.9; letter-spacing:-.045em;
   font-variant-numeric:tabular-nums; color:var(--cream);
 }
-.num.win{ color:var(--win); }
-.num.near{ color:var(--near); }
-.num.miss{ color:var(--accent); }
+.num.top{ color:var(--gold); }
+.num.out{ color:var(--accent); }
 
-.verdict{ min-height:clamp(52px,13vh,96px); display:flex; flex-direction:column;
-          justify-content:center; gap:6px; }
+.verdict{ display:flex; flex-direction:column; justify-content:center; gap:5px;
+          min-height:clamp(46px,11vh,86px); }
 .verdict .tier{
   font-family:var(--display); font-style:italic; font-weight:900;
-  font-size:clamp(24px,7.4vw,44px); line-height:1; letter-spacing:-.03em;
+  font-size:clamp(21px,6.4vw,38px); line-height:1; letter-spacing:-.03em;
   text-transform:uppercase;
 }
-.verdict .tier.win{ color:var(--win); }
-.verdict .tier.near{ color:var(--near); }
-.verdict .tier.miss{ color:var(--cream); }
-.verdict .gap{
-  font-size:clamp(13px,3.4vw,17px); font-weight:600; color:var(--muted);
-}
+.verdict .tier.top{ color:var(--gold); }
+.verdict .gap{ font-size:clamp(12px,3.2vw,16px); font-weight:600; color:var(--muted); }
 .verdict .gap b{ color:var(--cream); font-variant-numeric:tabular-nums; }
 
-/* ---------- botão ---------- */
-.act{
-  flex:0 0 auto; width:100%; border:0; border-radius:18px; cursor:pointer;
+/* ---------- nome ---------- */
+.namebox{ display:none; width:100%; max-width:420px; gap:8px; margin-top:4px; }
+.namebox.on{ display:flex; }
+.namebox input{
+  flex:1; min-width:0; font:inherit; font-size:16px; font-weight:600;
+  color:var(--cream); background:var(--panel); border:1px solid var(--line);
+  border-radius:12px; padding:13px 14px; user-select:text; -webkit-user-select:text;
+}
+.namebox input::placeholder{ color:var(--muted); }
+.namebox input:focus{ outline:2px solid var(--gold); outline-offset:1px; }
+.namebox button{
+  font:inherit; font-family:var(--display); font-weight:900; font-style:italic;
+  font-size:17px; text-transform:uppercase; letter-spacing:-.01em;
+  color:var(--bg); background:var(--gold); border:0; border-radius:12px;
+  padding:13px 18px; cursor:pointer;
+}
+
+/* ---------- tabela ---------- */
+.board{ display:none; flex:1; flex-direction:column; min-height:0; padding-top:10px; }
+.board.on{ display:flex; }
+.board h2{
   font-family:var(--display); font-style:italic; font-weight:900;
-  font-size:clamp(26px,7.6vw,40px); letter-spacing:-.02em; text-transform:uppercase;
-  padding:clamp(20px,4.4vh,34px) 20px; color:var(--bg); background:var(--cream);
+  font-size:clamp(21px,6vw,32px); letter-spacing:-.03em; text-transform:uppercase;
+  margin:4px 0 3px;
+}
+.board .note{ font-size:clamp(11px,2.9vw,13px); color:var(--muted); margin-bottom:12px; }
+.rows{ flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+.row{
+  display:grid; grid-template-columns:34px 1fr auto; gap:12px; align-items:center;
+  padding:12px 0; border-bottom:1px solid var(--line);
+}
+.row .pos{
+  font-family:var(--display); font-weight:900; font-style:italic; font-size:19px;
+  color:var(--muted); font-variant-numeric:tabular-nums;
+}
+.row.prize .pos{ color:var(--gold); }
+.row .who{ font-size:clamp(14px,3.8vw,17px); font-weight:600;
+           overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.row .who small{ display:block; font-size:11px; font-weight:600; color:var(--muted);
+                 letter-spacing:.06em; text-transform:uppercase; margin-top:2px; }
+.row .err{ font-family:var(--display); font-weight:800; font-size:clamp(14px,3.8vw,17px);
+           font-variant-numeric:tabular-nums; color:var(--cream); }
+.row.me{ background:rgba(232,185,60,.09); }
+.empty{ color:var(--muted); font-size:14px; padding:22px 0; text-align:center; }
+
+/* ---------- botão e rodapé ---------- */
+.act{
+  flex:0 0 auto; width:100%; border:0; border-radius:16px; cursor:pointer;
+  font-family:var(--display); font-style:italic; font-weight:900;
+  font-size:clamp(23px,6.8vw,36px); letter-spacing:-.02em; text-transform:uppercase;
+  padding:clamp(17px,3.9vh,30px) 18px; color:var(--bg); background:var(--cream);
   transition:transform .06s ease, background .12s ease;
 }
 .act:active{ transform:scale(.985); }
@@ -90,11 +134,11 @@ body{
 .act:focus-visible{ outline:3px solid var(--cream); outline-offset:3px; }
 
 .hint{
-  flex:0 0 auto; text-align:center; margin-top:12px;
-  font-size:clamp(11px,2.8vw,13px); font-weight:600; letter-spacing:.1em;
-  text-transform:uppercase; color:var(--muted); min-height:16px;
+  flex:0 0 auto; text-align:center; margin-top:10px; min-height:15px;
+  font-size:clamp(10px,2.7vw,12px); font-weight:700; letter-spacing:.09em;
+  text-transform:uppercase; color:var(--muted);
 }
-.hint b{ color:var(--cream); }
+.hint b{ color:var(--gold); }
 
 @media (prefers-reduced-motion: reduce){ .act{ transition:none; } }
 </style>
@@ -102,52 +146,104 @@ body{
 <div id="app">
   <div class="bar">
     <div class="wm" id="wm">incarport<span>.</span></div>
-    <div class="best">Melhor do dia<b id="best">—</b></div>
-  </div>
-
-  <div class="stage">
-    <div class="target">Pára o contador nos <b>5 000 €</b></div>
-    <div class="num" id="num">0 €</div>
-    <div class="verdict" id="verdict">
-      <div class="tier miss" id="tier">Toca para começar</div>
-      <div class="gap" id="gap">É a poupança média de quem importa connosco.</div>
+    <div class="tabs">
+      <button class="tab" id="tabJogo" type="button" aria-pressed="true">Jogo</button>
+      <button class="tab" id="tabTop" type="button" aria-pressed="false">Top 5</button>
     </div>
   </div>
 
+  <!-- ecrã do jogo -->
+  <div class="stage" id="stage">
+    <div class="target">Pára o contador nos <b>5 000 €</b></div>
+    <div class="num" id="num">0 €</div>
+    <div class="verdict">
+      <div class="tier" id="tier">Toca para começar</div>
+      <div class="gap" id="gap">É a poupança média de quem importa connosco.</div>
+    </div>
+    <div class="namebox" id="namebox">
+      <input id="name" type="text" placeholder="Primeiro nome e apelido" maxlength="28"
+             autocomplete="off" autocapitalize="words" spellcheck="false" />
+      <button id="save" type="button">Entrar</button>
+    </div>
+  </div>
+
+  <!-- ecrã da tabela -->
+  <div class="board" id="board">
+    <h2>Os cinco melhores</h2>
+    <div class="note">Quem ficar mais perto dos 5 000 € leva o prémio maior.</div>
+    <div class="rows" id="rows"></div>
+  </div>
+
   <button class="act" id="act" type="button">Começar</button>
-  <div class="hint" id="hint">Um jogo por pessoa</div>
+  <div class="hint" id="hint">Toda a gente leva <b>voucher de 350 €</b></div>
 </div>
 
 <script>
 (function(){
-  var TARGET = 5000, MAX = 10000, PERIOD = 2600;   // ms por volta completa
-  var WIN = 150, NEAR = 600;                       // margens dos premios
-  var state = "idle", raf = null, t0 = 0, value = 0;
+  var TARGET = 5000, MAX = 10000, PERIOD = 2600, KEEP = 20, PRIZES = 5;
+  var PREMIOS = ["Volta de avião", "Volta num supercarro", "Passeio de barco",
+                 "Detalhe automóvel", "Sessão fotográfica"];
 
-  var elNum = document.getElementById("num"),
-      elTier = document.getElementById("tier"),
-      elGap = document.getElementById("gap"),
-      elAct = document.getElementById("act"),
-      elHint = document.getElementById("hint"),
-      elBest = document.getElementById("best");
+  var state = "idle", raf = null, t0 = 0, value = 0, pending = null, view = "jogo";
 
-  var KEY = "incarport-jogo-melhor";
-  function readBest(){
-    try{ var v = localStorage.getItem(KEY); return v === null ? null : Number(v); }
-    catch(e){ return null; }
+  var $ = function(id){ return document.getElementById(id); };
+  var elNum=$("num"), elTier=$("tier"), elGap=$("gap"), elAct=$("act"), elHint=$("hint"),
+      elStage=$("stage"), elBoard=$("board"), elRows=$("rows"), elBox=$("namebox"),
+      elName=$("name"), elSave=$("save"), elTabJogo=$("tabJogo"), elTabTop=$("tabTop");
+
+  var KEY = "incarport-jogo-top";
+  function load(){
+    try{ return JSON.parse(localStorage.getItem(KEY)) || []; }catch(e){ return []; }
   }
-  function writeBest(v){ try{ localStorage.setItem(KEY, String(v)); }catch(e){} }
-
-  var best = readBest();
-  function paintBest(){
-    elBest.textContent = best === null ? "—" : (best === 0 ? "certo!" : fmt(best) + " de erro");
-  }
+  function save(list){ try{ localStorage.setItem(KEY, JSON.stringify(list)); }catch(e){} }
+  var top = load();
 
   function fmt(n){
     return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " €";
   }
 
-  // sobe ate MAX e volta a descer, para dar sempre hipotese de acertar
+  // posicao que um erro ocuparia (1 = melhor). Empate fica atras de quem chegou antes.
+  function placeOf(err){
+    var p = 1;
+    for(var i=0;i<top.length;i++){ if(top[i].err < err) p++; }
+    return p;
+  }
+
+  function paintBoard(highlight){
+    if(!top.length){
+      elRows.innerHTML = '<div class="empty">Ainda ninguém jogou hoje.<br>Sê o primeiro.</div>';
+      return;
+    }
+    var html = "";
+    for(var i=0;i<Math.min(top.length, 10);i++){
+      var e = top[i];
+      var prize = i < PRIZES ? PREMIOS[i] : "";
+      html += '<div class="row' + (i < PRIZES ? ' prize' : '') +
+              (highlight != null && i === highlight ? ' me' : '') + '">' +
+              '<div class="pos">' + (i+1) + '</div>' +
+              '<div class="who">' + esc(e.nome) +
+              (prize ? '<small>' + prize + '</small>' : '') + '</div>' +
+              '<div class="err">' + fmt(e.err) + '</div></div>';
+    }
+    elRows.innerHTML = html;
+  }
+  function esc(s){
+    return String(s).replace(/[&<>"']/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+    });
+  }
+
+  function show(which){
+    view = which;
+    var jogo = which === "jogo";
+    elStage.style.display = jogo ? "flex" : "none";
+    elBoard.classList.toggle("on", !jogo);
+    elAct.style.display = jogo ? "" : "none";
+    elTabJogo.setAttribute("aria-pressed", String(jogo));
+    elTabTop.setAttribute("aria-pressed", String(!jogo));
+    if(!jogo) paintBoard(null);
+  }
+
   function tick(now){
     var p = ((now - t0) % PERIOD) / PERIOD;
     var tri = p < 0.5 ? p * 2 : (1 - p) * 2;
@@ -157,9 +253,12 @@ body{
   }
 
   function start(){
+    if(view !== "jogo") show("jogo");
     state = "running";
+    pending = null;
+    elBox.classList.remove("on");
     elNum.className = "num";
-    elTier.className = "tier miss";
+    elTier.className = "tier";
     elTier.textContent = "Agora!";
     elGap.innerHTML = "Carrega quando chegares aos 5 000 €.";
     elAct.textContent = "Parar";
@@ -172,54 +271,84 @@ body{
   function stop(){
     state = "done";
     cancelAnimationFrame(raf);
-    var v = Math.round(value);
-    var d = Math.abs(v - TARGET);
+    var v = Math.round(value), err = Math.abs(v - TARGET);
     elNum.textContent = fmt(v);
 
-    var tier, cls, gap;
-    if(d <= WIN){       tier = "Prémio grande!";  cls = "win";
-      gap = d === 0 ? "Em cheio. Nos <b>5 000 €</b> certos." : "A <b>" + fmt(d) + "</b> do alvo."; }
-    else if(d <= NEAR){ tier = "Quase!";          cls = "near";
-      gap = "Falhaste por <b>" + fmt(d) + "</b>. Leva o prémio pequeno."; }
-    else {              tier = "Não foi desta";   cls = "miss";
-      gap = "Falhaste por <b>" + fmt(d) + "</b>. Mas levas na mesma uma lembrança."; }
-
-    elNum.classList.add(cls);
-    elTier.className = "tier " + cls;
-    elTier.textContent = tier;
-    elGap.innerHTML = gap;
-
-    if(best === null || d < best){ best = d; writeBest(best); paintBest(); }
-
+    var place = placeOf(err);
     elAct.textContent = "Jogar outra vez";
     elAct.classList.remove("stop");
-    elHint.innerHTML = "5 000 € é a <b>poupança média</b> de quem importa connosco";
+
+    if(place <= PRIZES){
+      pending = err;
+      elNum.classList.add("top");
+      elTier.className = "tier top";
+      elTier.textContent = place + ".º lugar!";
+      elGap.innerHTML = "A <b>" + fmt(err) + "</b> do alvo — dá <b>" +
+                        esc(PREMIOS[place-1]) + "</b>. Escreve o teu nome.";
+      elBox.classList.add("on");
+      elName.value = "";
+      elHint.innerHTML = "Só entras no quadro depois de te inscreveres";
+      setTimeout(function(){ try{ elName.focus(); }catch(e){} }, 60);
+    } else {
+      pending = null;
+      elNum.classList.add("out");
+      elTier.className = "tier";
+      elTier.textContent = "Não foi desta";
+      elGap.innerHTML = "Falhaste por <b>" + fmt(err) +
+                        "</b>. Ficavas em " + place + ".º — só os cinco primeiros levam prémio.";
+      elHint.innerHTML = "Levas na mesma o <b>voucher de 350 €</b>";
+    }
+  }
+
+  function commit(){
+    if(pending == null) return;
+    var nome = elName.value.trim() || "Anónimo";
+    var stamp = Date.now();
+    top.push({ nome: nome, err: pending, t: stamp });
+    top.sort(function(a,b){ return a.err - b.err || a.t - b.t; });
+    if(top.length > KEEP) top.length = KEEP;
+    var idx = -1;
+    for(var i = 0; i < top.length; i++){ if(top[i].t === stamp){ idx = i; break; } }
+    save(top);
+    pending = null;
+    elBox.classList.remove("on");
+    elHint.innerHTML = "Ficaste no quadro. <b>Voucher de 350 €</b> para toda a gente";
+    show("top");
+    paintBoard(idx);
   }
 
   elAct.addEventListener("click", function(){
     if(state === "running") stop(); else start();
   });
+  elSave.addEventListener("click", commit);
+  elName.addEventListener("keydown", function(e){
+    if(e.key === "Enter"){ e.preventDefault(); commit(); }
+  });
+  elTabJogo.addEventListener("click", function(){ show("jogo"); });
+  elTabTop.addEventListener("click", function(){ show("top"); });
 
-  // barra de espaco para quem usar um teclado ou apontador
   document.addEventListener("keydown", function(e){
-    if(e.code === "Space" || e.code === "Enter"){ e.preventDefault(); elAct.click(); }
+    if(document.activeElement === elName) return;
+    if(e.code === "Space"){ e.preventDefault(); elAct.click(); }
   });
 
-  // tres toques seguidos no logotipo apagam o recorde do dia (so para a equipa)
-  var taps = [], wm = document.getElementById("wm");
-  wm.addEventListener("click", function(){
+  // tres toques seguidos no logotipo apagam o quadro (so para a equipa)
+  var taps = [];
+  $("wm").addEventListener("click", function(){
     var now = Date.now();
     taps.push(now);
     taps = taps.filter(function(t){ return now - t < 1200; });
     if(taps.length >= 3){
       taps = [];
-      best = null;
-      try{ localStorage.removeItem(KEY); }catch(e){}
-      paintBest();
-      elHint.innerHTML = "Recorde do dia apagado";
+      if(confirm("Apagar o quadro dos melhores?")){
+        top = [];
+        try{ localStorage.removeItem(KEY); }catch(e){}
+        paintBoard(null);
+        elHint.innerHTML = "Quadro apagado";
+      }
     }
   });
 
-  paintBest();
+  show("jogo");
 })();
 </script>
