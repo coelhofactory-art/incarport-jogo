@@ -138,6 +138,53 @@ body{
 }
 #dump.on{ display:block; }
 
+/* ---------- voucher ---------- */
+.vouch{ display:none; flex:1; flex-direction:column; min-height:0; padding-top:8px; }
+.vouch.on{ display:flex; }
+.ticket{
+  flex:1; min-height:0; display:flex; flex-direction:column; justify-content:center;
+  text-align:center; border:2px dashed rgba(232,185,60,.55); border-radius:20px;
+  background:linear-gradient(180deg, rgba(232,185,60,.10), rgba(232,185,60,.03));
+  padding:clamp(16px,3.4vh,30px) 20px; gap:clamp(4px,1.1vh,10px);
+}
+.ticket .lab{
+  font-size:clamp(10px,2.7vw,12px); font-weight:700; letter-spacing:.24em;
+  text-transform:uppercase; color:var(--gold);
+}
+.ticket .val{
+  font-family:var(--display); font-style:italic; font-weight:900;
+  font-size:clamp(62px,19vw,124px); line-height:.88; letter-spacing:-.045em;
+  color:var(--gold);
+}
+.ticket .what{
+  font-family:var(--display); font-weight:800; font-size:clamp(16px,4.4vw,23px);
+  text-transform:uppercase; letter-spacing:-.01em; color:var(--cream);
+}
+.ticket .code{
+  margin-top:clamp(4px,1.2vh,10px);
+  font-family:ui-monospace,Menlo,monospace; font-weight:700;
+  font-size:clamp(24px,7vw,40px); letter-spacing:.14em; color:var(--cream);
+}
+.ticket .quem{
+  font-size:clamp(12px,3.2vw,15px); font-weight:600; color:var(--cream);
+  min-height:1.2em;
+}
+.ticket .until{
+  font-size:clamp(11px,3vw,14px); font-weight:700; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--cream);
+}
+.ticket .terms{
+  margin-top:clamp(4px,1.2vh,10px); font-size:clamp(9.5px,2.5vw,11.5px);
+  line-height:1.5; color:var(--muted); max-width:34em; margin-left:auto; margin-right:auto;
+}
+.ticket .who2{ font-family:var(--display); font-style:italic; font-weight:900;
+               font-size:clamp(14px,3.8vw,19px); letter-spacing:-.02em; color:var(--cream); }
+.shot{
+  flex:0 0 auto; text-align:center; padding-top:11px;
+  font-size:clamp(10px,2.7vw,12px); font-weight:700; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--gold);
+}
+
 /* ---------- botão e rodapé ---------- */
 .act{
   flex:0 0 auto; width:100%; border:0; border-radius:16px; cursor:pointer;
@@ -166,6 +213,7 @@ body{
     <div class="tabs">
       <button class="tab" id="tabJogo" type="button" aria-pressed="true">Jogo</button>
       <button class="tab" id="tabTop" type="button" aria-pressed="false">Top 5</button>
+      <button class="tab" id="tabVouch" type="button" aria-pressed="false">Voucher</button>
     </div>
   </div>
 
@@ -196,6 +244,22 @@ body{
     <textarea id="dump" readonly></textarea>
   </div>
 
+  <!-- ecrã do voucher -->
+  <div class="vouch" id="vouch">
+    <div class="ticket">
+      <div class="lab">Voucher de desconto</div>
+      <div class="val">350 €</div>
+      <div class="what">Na importação do teu carro</div>
+      <div class="code" id="code">INC-00000</div>
+      <div class="quem" id="quem"></div>
+      <div class="until">Válido até 31 de dezembro de 2026</div>
+      <div class="terms">Um por pessoa e por importação. Não acumulável com outras campanhas.
+      Tem de ser apresentado no pedido de proposta.</div>
+      <div class="who2">incarport.com · @incarport_</div>
+    </div>
+    <div class="shot">Faz uma captura de ecrã — é este o teu voucher</div>
+  </div>
+
   <button class="act" id="act" type="button">Começar</button>
   <div class="hint" id="hint">Toda a gente leva <b>voucher de 350 €</b></div>
 </div>
@@ -212,7 +276,8 @@ body{
   var elNum=$("num"), elTier=$("tier"), elGap=$("gap"), elAct=$("act"), elHint=$("hint"),
       elStage=$("stage"), elBoard=$("board"), elRows=$("rows"), elBox=$("namebox"),
       elName=$("name"), elSave=$("save"), elTabJogo=$("tabJogo"), elTabTop=$("tabTop"),
-      elDump=$("dump");
+      elDump=$("dump"), elVouch=$("vouch"), elCode=$("code"), elQuem=$("quem"),
+      elTabVouch=$("tabVouch");
 
   var KEY = "incarport-jogo-top";
   function load(){
@@ -220,6 +285,15 @@ body{
   }
   function save(list){ try{ localStorage.setItem(KEY, JSON.stringify(list)); }catch(e){} }
   var top = load();
+
+  // INC-ABCDE : E = (A+B+C+D) mod 10, para a equipa poder validar sem base de dados
+  function novoCodigo(){
+    var d = [], soma = 0;
+    for(var i=0;i<4;i++){ var n = Math.floor(Math.random()*10); d.push(n); soma += n; }
+    d.push(soma % 10);
+    return "INC-" + d.join("");
+  }
+  var codigoAtual = "";
 
   function fmt(n){
     return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " €";
@@ -258,14 +332,20 @@ body{
 
   function show(which){
     view = which;
-    var jogo = which === "jogo";
-    elStage.style.display = jogo ? "flex" : "none";
-    elBoard.classList.toggle("on", !jogo);
-    elAct.style.display = jogo ? "" : "none";
-    elTabJogo.setAttribute("aria-pressed", String(jogo));
-    elTabTop.setAttribute("aria-pressed", String(!jogo));
-    if(jogo) elDump.classList.remove("on");
-    if(!jogo) paintBoard(null);
+    elStage.style.display = which === "jogo" ? "flex" : "none";
+    elBoard.classList.toggle("on", which === "top");
+    elVouch.classList.toggle("on", which === "voucher");
+    elAct.style.display = which === "jogo" ? "" : "none";
+    elTabJogo.setAttribute("aria-pressed", String(which === "jogo"));
+    elTabTop.setAttribute("aria-pressed", String(which === "top"));
+    elTabVouch.setAttribute("aria-pressed", String(which === "voucher"));
+    if(which !== "top") elDump.classList.remove("on");
+    if(which === "top") paintBoard(null);
+    if(which === "voucher"){
+      if(!codigoAtual){ codigoAtual = novoCodigo(); }
+      elCode.textContent = codigoAtual;
+      elHint.innerHTML = "Captura de ecrã — <b>vale 350 €</b>";
+    }
   }
 
   function tick(now){
@@ -279,7 +359,7 @@ body{
   function start(){
     if(view !== "jogo") show("jogo");
     state = "running";
-    pending = null;
+    pending = null; codigoAtual = ""; elQuem.textContent = "";
     elBox.classList.remove("on");
     elNum.className = "num";
     elTier.className = "tier";
@@ -312,6 +392,7 @@ body{
       elBox.classList.add("on");
       elName.value = "";
       elHint.innerHTML = "Só entras no quadro depois de te inscreveres";
+      codigoAtual = novoCodigo(); elQuem.textContent = "";
       setTimeout(function(){ try{ elName.focus(); }catch(e){} }, 60);
     } else {
       pending = null;
@@ -320,7 +401,8 @@ body{
       elTier.textContent = "Não foi desta";
       elGap.innerHTML = "Falhaste por <b>" + fmt(err) +
                         "</b>. Ficavas em " + place + ".º — só os cinco primeiros levam prémio.";
-      elHint.innerHTML = "Levas na mesma o <b>voucher de 350 €</b>";
+      elHint.innerHTML = "Toca em <b>Voucher</b> para levares os teus 350 €";
+      codigoAtual = novoCodigo(); elQuem.textContent = "";
     }
   }
 
@@ -335,8 +417,9 @@ body{
     for(var i = 0; i < top.length; i++){ if(top[i].t === stamp){ idx = i; break; } }
     save(top);
     pending = null;
+    elQuem.textContent = nome;
     elBox.classList.remove("on");
-    elHint.innerHTML = "Ficaste no quadro. <b>Voucher de 350 €</b> para toda a gente";
+    elHint.innerHTML = "Ficaste no quadro. Toca em <b>Voucher</b>";
     show("top");
     paintBoard(idx);
   }
@@ -350,6 +433,7 @@ body{
   });
   elTabJogo.addEventListener("click", function(){ show("jogo"); });
   elTabTop.addEventListener("click", function(){ show("top"); });
+  elTabVouch.addEventListener("click", function(){ show("voucher"); });
 
   document.addEventListener("keydown", function(e){
     if(document.activeElement === elName || document.activeElement === elDump) return;
