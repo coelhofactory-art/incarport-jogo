@@ -101,7 +101,18 @@ body{
   font-size:clamp(21px,6vw,32px); letter-spacing:-.03em; text-transform:uppercase;
   margin:4px 0 3px;
 }
-.board .note{ font-size:clamp(11px,2.9vw,13px); color:var(--muted); margin-bottom:12px; }
+.board .note{ font-size:clamp(11px,2.9vw,13px); color:var(--muted); margin-bottom:9px; }
+.sync{
+  display:inline-flex; align-items:center; gap:7px; margin-bottom:12px;
+  font-size:clamp(10px,2.6vw,12px); font-weight:700; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--muted);
+  border:1px solid var(--line); border-radius:999px; padding:6px 12px;
+}
+.sync::before{
+  content:""; width:8px; height:8px; border-radius:50%; background:var(--muted); flex:0 0 auto;
+}
+.sync.on{ color:var(--win); border-color:rgba(55,201,125,.4); }
+.sync.on::before{ background:var(--win); }
 .rows{ flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; }
 .row{
   display:grid; grid-template-columns:34px 1fr auto; gap:12px; align-items:center;
@@ -236,6 +247,7 @@ body{
   <div class="board" id="board">
     <h2>Os cinco melhores</h2>
     <div class="note">Quem ficar mais perto dos 5 000 € leva o prémio maior.</div>
+    <div class="sync" id="sync"></div>
     <div class="rows" id="rows"></div>
     <div class="boardfoot">
       <button id="copiar" type="button">Copiar lista</button>
@@ -271,35 +283,80 @@ body{
                  "Detalhe automóvel", "Sessão fotográfica"];
 
   var state = "idle", raf = null, t0 = 0, value = 0, pending = null, view = "jogo";
+  var top = [], codigoAtual = "";
 
   var $ = function(id){ return document.getElementById(id); };
   var elNum=$("num"), elTier=$("tier"), elGap=$("gap"), elAct=$("act"), elHint=$("hint"),
       elStage=$("stage"), elBoard=$("board"), elRows=$("rows"), elBox=$("namebox"),
       elName=$("name"), elSave=$("save"), elTabJogo=$("tabJogo"), elTabTop=$("tabTop"),
       elDump=$("dump"), elVouch=$("vouch"), elCode=$("code"), elQuem=$("quem"),
-      elTabVouch=$("tabVouch");
+      elTabVouch=$("tabVouch"), elSync=$("sync");
 
+  /* ---------------- onde ficam as jogadas ----------------
+     Com ligacao partilhada, todos os telemoveis veem a mesma tabela.
+     Sem ela, cada telemovel guarda a sua e junta-se no fim pelo botao Copiar. */
   var KEY = "incarport-jogo-top";
-  function load(){
+  var remoto = null;                       // coleccao partilhada, quando existir
+
+  function lerLocal(){
     try{ return JSON.parse(localStorage.getItem(KEY)) || []; }catch(e){ return []; }
   }
-  function save(list){ try{ localStorage.setItem(KEY, JSON.stringify(list)); }catch(e){} }
-  var top = load();
+  function gravarLocal(){ try{ localStorage.setItem(KEY, JSON.stringify(top)); }catch(e){} }
 
-  // INC-ABCDE : E = (A+B+C+D) mod 10, para a equipa poder validar sem base de dados
+  function ordenar(l){
+    l.sort(function(a,b){ return a.err - b.err || a.t - b.t; });
+    if(l.length > KEEP) l.length = KEEP;
+    return l;
+  }
+
+  function marcarSync(ligado){
+    if(!elSync) return;
+    elSync.textContent = ligado ? "Tabela partilhada entre os telemóveis"
+                                : "Só neste telemóvel — junta as listas no fim";
+    elSync.className = "sync" + (ligado ? " on" : "");
+  }
+
+  top = ordenar(lerLocal());
+  marcarSync(false);
+
+  (async function ligar(){
+    try{
+      if(!(window.claude && typeof window.claude.use === "function")) return;
+      var db = await window.claude.use("db");
+      if(!db) return;
+      remoto = db.collection("jogadas");
+      remoto.orderBy("err", "asc").limit(KEEP).onSnapshot(function(snap){
+        top = snap.docs.map(function(d){
+          var v = d.data() || {};
+          return { id:d.id, nome: String(v.nome || "Anónimo"),
+                   err: Number(v.err) || 0, t: Number(v.t) || 0 };
+        });
+        ordenar(top);
+        marcarSync(true);
+        if(view === "top") paintBoard(null);
+      }, function(){ marcarSync(false); });
+      marcarSync(true);
+    }catch(e){ /* segue em modo local */ }
+  })();
+
+  /* ---------------- codigo do voucher ---------------- */
+  // INC-ABCDE : E = (A+B+C+D) mod 10, para a equipa validar sem base de dados
   function novoCodigo(){
     var d = [], soma = 0;
     for(var i=0;i<4;i++){ var n = Math.floor(Math.random()*10); d.push(n); soma += n; }
     d.push(soma % 10);
     return "INC-" + d.join("");
   }
-  var codigoAtual = "";
 
   function fmt(n){
-    return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " €";
+    return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, "\u2009") + " €";
+  }
+  function esc(s){
+    return String(s).replace(/[&<>"']/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+    });
   }
 
-  // posicao que um erro ocuparia (1 = melhor). Empate fica atras de quem chegou antes.
   function placeOf(err){
     var p = 1;
     for(var i=0;i<top.length;i++){ if(top[i].err < err) p++; }
@@ -308,13 +365,12 @@ body{
 
   function paintBoard(highlight){
     if(!top.length){
-      elRows.innerHTML = '<div class="empty">Ainda ninguém jogou hoje.<br>Sê o primeiro.</div>';
+      elRows.innerHTML = '<div class="empty">Ainda ninguém jogou.<br>Sê o primeiro.</div>';
       return;
     }
     var html = "";
     for(var i=0;i<Math.min(top.length, 10);i++){
-      var e = top[i];
-      var prize = i < PRIZES ? PREMIOS[i] : "";
+      var e = top[i], prize = i < PRIZES ? PREMIOS[i] : "";
       html += '<div class="row' + (i < PRIZES ? ' prize' : '') +
               (highlight != null && i === highlight ? ' me' : '') + '">' +
               '<div class="pos">' + (i+1) + '</div>' +
@@ -323,11 +379,6 @@ body{
               '<div class="err">' + fmt(e.err) + '</div></div>';
     }
     elRows.innerHTML = html;
-  }
-  function esc(s){
-    return String(s).replace(/[&<>"']/g, function(c){
-      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
-    });
   }
 
   function show(which){
@@ -342,12 +393,13 @@ body{
     if(which !== "top") elDump.classList.remove("on");
     if(which === "top") paintBoard(null);
     if(which === "voucher"){
-      if(!codigoAtual){ codigoAtual = novoCodigo(); }
+      if(!codigoAtual) codigoAtual = novoCodigo();
       elCode.textContent = codigoAtual;
       elHint.innerHTML = "Captura de ecrã — <b>vale 350 €</b>";
     }
   }
 
+  /* ---------------- o jogo ---------------- */
   function tick(now){
     var p = ((now - t0) % PERIOD) / PERIOD;
     var tri = p < 0.5 ? p * 2 : (1 - p) * 2;
@@ -377,11 +429,12 @@ body{
     cancelAnimationFrame(raf);
     var v = Math.round(value), err = Math.abs(v - TARGET);
     elNum.textContent = fmt(v);
-
-    var place = placeOf(err);
+    codigoAtual = novoCodigo();
+    elQuem.textContent = "";
     elAct.textContent = "Jogar outra vez";
     elAct.classList.remove("stop");
 
+    var place = placeOf(err);
     if(place <= PRIZES){
       pending = err;
       elNum.classList.add("top");
@@ -392,17 +445,15 @@ body{
       elBox.classList.add("on");
       elName.value = "";
       elHint.innerHTML = "Só entras no quadro depois de te inscreveres";
-      codigoAtual = novoCodigo(); elQuem.textContent = "";
       setTimeout(function(){ try{ elName.focus(); }catch(e){} }, 60);
     } else {
       pending = null;
       elNum.classList.add("out");
       elTier.className = "tier";
       elTier.textContent = "Não foi desta";
-      elGap.innerHTML = "Falhaste por <b>" + fmt(err) +
-                        "</b>. Ficavas em " + place + ".º — só os cinco primeiros levam prémio.";
+      elGap.innerHTML = "Falhaste por <b>" + fmt(err) + "</b>. Ficavas em " + place +
+                        ".º — só os cinco primeiros levam prémio.";
       elHint.innerHTML = "Toca em <b>Voucher</b> para levares os teus 350 €";
-      codigoAtual = novoCodigo(); elQuem.textContent = "";
     }
   }
 
@@ -410,20 +461,40 @@ body{
     if(pending == null) return;
     var nome = elName.value.trim() || "Anónimo";
     var stamp = Date.now();
-    top.push({ nome: nome, err: pending, t: stamp });
-    top.sort(function(a,b){ return a.err - b.err || a.t - b.t; });
-    if(top.length > KEEP) top.length = KEEP;
+    var entrada = { nome: nome, err: pending, t: stamp };
+
+    if(remoto){
+      remoto.add(entrada).catch(function(){
+        top.push(entrada); ordenar(top); gravarLocal();
+        marcarSync(false); paintBoard(null);
+      });
+    } else {
+      top.push(entrada); ordenar(top); gravarLocal();
+    }
+
     var idx = -1;
-    for(var i = 0; i < top.length; i++){ if(top[i].t === stamp){ idx = i; break; } }
-    save(top);
+    for(var i=0;i<top.length;i++){ if(top[i].t === stamp){ idx = i; break; } }
     pending = null;
     elQuem.textContent = nome;
     elBox.classList.remove("on");
     elHint.innerHTML = "Ficaste no quadro. Toca em <b>Voucher</b>";
     show("top");
-    paintBoard(idx);
+    if(idx >= 0) paintBoard(idx);
   }
 
+  /* ---------------- passar a lista para os outros ---------------- */
+  function listaTexto(){
+    if(!top.length) return "incarport · jogo do Caramulo\nAinda não há jogadas.";
+    var l = ["incarport · jogo do Caramulo",
+             (remoto ? "Tabela partilhada" : "Lista deste telemóvel") + " — " +
+             top.length + (top.length === 1 ? " jogada" : " jogadas"), ""];
+    for(var i=0;i<top.length;i++){
+      l.push((i+1) + ". " + top[i].nome + " — " + fmt(top[i].err) + " de erro");
+    }
+    return l.join("\n");
+  }
+
+  /* ---------------- ligacoes ---------------- */
   elAct.addEventListener("click", function(){
     if(state === "running") stop(); else start();
   });
@@ -435,57 +506,47 @@ body{
   elTabTop.addEventListener("click", function(){ show("top"); });
   elTabVouch.addEventListener("click", function(){ show("voucher"); });
 
-  document.addEventListener("keydown", function(e){
-    if(document.activeElement === elName || document.activeElement === elDump) return;
-    if(e.code === "Space"){ e.preventDefault(); elAct.click(); }
-  });
-
-  // ---- passar a lista deste telemovel para os outros ----
-  function listaTexto(){
-    if(!top.length) return "incarport · jogo do Caramulo\nEste telemóvel ainda não tem jogadas.";
-    var l = ["incarport · jogo do Caramulo",
-             "Lista deste telemóvel — " + top.length + (top.length === 1 ? " jogada" : " jogadas"),
-             ""];
-    for(var i=0;i<top.length;i++){
-      l.push((i+1) + ". " + top[i].nome + " — " + fmt(top[i].err) + " de erro");
-    }
-    return l.join("\n");
-  }
-
-  elDump.value = "";
   $("verTudo").addEventListener("click", function(){
     elDump.value = listaTexto();
     elDump.classList.toggle("on");
     if(elDump.classList.contains("on")){ elDump.focus(); elDump.select(); }
   });
-
   $("copiar").addEventListener("click", function(){
     var txt = listaTexto();
-    function feito(){ elHint.innerHTML = "Lista copiada. <b>Cola no grupo</b>"; }
     function falhou(){
       elDump.value = txt; elDump.classList.add("on"); elDump.focus(); elDump.select();
       elHint.innerHTML = "Copia o texto à mão";
     }
     if(navigator.clipboard && navigator.clipboard.writeText){
-      navigator.clipboard.writeText(txt).then(feito, falhou);
+      navigator.clipboard.writeText(txt).then(function(){
+        elHint.innerHTML = "Lista copiada. <b>Cola no grupo</b>";
+      }, falhou);
     } else { falhou(); }
   });
 
-  // tres toques seguidos no logotipo apagam o quadro (so para a equipa)
+  document.addEventListener("keydown", function(e){
+    if(document.activeElement === elName || document.activeElement === elDump) return;
+    if(e.code === "Space"){ e.preventDefault(); elAct.click(); }
+  });
+
+  // tres toques seguidos no logotipo apagam a tabela (so para a equipa)
   var taps = [];
   $("wm").addEventListener("click", function(){
     var now = Date.now();
     taps.push(now);
     taps = taps.filter(function(t){ return now - t < 1200; });
-    if(taps.length >= 3){
-      taps = [];
-      if(confirm("Apagar o quadro dos melhores?")){
-        top = [];
-        try{ localStorage.removeItem(KEY); }catch(e){}
-        paintBoard(null);
-        elHint.innerHTML = "Quadro apagado";
-      }
+    if(taps.length < 3) return;
+    taps = [];
+    if(!confirm("Apagar a tabela dos melhores?")) return;
+    if(remoto){
+      remoto.get().then(function(snap){
+        snap.docs.forEach(function(d){ remoto.doc(d.id).delete(); });
+      }).catch(function(){});
     }
+    top = [];
+    try{ localStorage.removeItem(KEY); }catch(e){}
+    paintBoard(null);
+    elHint.innerHTML = "Tabela apagada";
   });
 
   show("jogo");
