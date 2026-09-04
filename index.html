@@ -121,6 +121,23 @@ body{
 .row.me{ background:rgba(232,185,60,.09); }
 .empty{ color:var(--muted); font-size:14px; padding:22px 0; text-align:center; }
 
+.boardfoot{ flex:0 0 auto; padding-top:12px; display:flex; gap:8px; align-items:center; }
+.boardfoot button{
+  flex:1; font:inherit; font-family:var(--display); font-weight:900; font-style:italic;
+  font-size:16px; text-transform:uppercase; letter-spacing:-.01em;
+  color:var(--bg); background:var(--cream); border:0; border-radius:12px;
+  padding:14px 12px; cursor:pointer;
+}
+.boardfoot button.ghost{ background:none; color:var(--muted); border:1px solid var(--line); }
+.boardfoot button:focus-visible{ outline:2px solid var(--cream); outline-offset:2px; }
+#dump{
+  display:none; width:100%; height:132px; margin-top:10px; resize:none;
+  font-family:ui-monospace,Menlo,monospace; font-size:12px; line-height:1.45;
+  color:var(--cream); background:var(--panel); border:1px solid var(--line);
+  border-radius:12px; padding:10px; user-select:text; -webkit-user-select:text;
+}
+#dump.on{ display:block; }
+
 /* ---------- botão e rodapé ---------- */
 .act{
   flex:0 0 auto; width:100%; border:0; border-radius:16px; cursor:pointer;
@@ -172,6 +189,11 @@ body{
     <h2>Os cinco melhores</h2>
     <div class="note">Quem ficar mais perto dos 5 000 € leva o prémio maior.</div>
     <div class="rows" id="rows"></div>
+    <div class="boardfoot">
+      <button id="copiar" type="button">Copiar lista</button>
+      <button id="verTudo" class="ghost" type="button">Ver texto</button>
+    </div>
+    <textarea id="dump" readonly></textarea>
   </div>
 
   <button class="act" id="act" type="button">Começar</button>
@@ -189,7 +211,8 @@ body{
   var $ = function(id){ return document.getElementById(id); };
   var elNum=$("num"), elTier=$("tier"), elGap=$("gap"), elAct=$("act"), elHint=$("hint"),
       elStage=$("stage"), elBoard=$("board"), elRows=$("rows"), elBox=$("namebox"),
-      elName=$("name"), elSave=$("save"), elTabJogo=$("tabJogo"), elTabTop=$("tabTop");
+      elName=$("name"), elSave=$("save"), elTabJogo=$("tabJogo"), elTabTop=$("tabTop"),
+      elDump=$("dump");
 
   var KEY = "incarport-jogo-top";
   function load(){
@@ -241,6 +264,7 @@ body{
     elAct.style.display = jogo ? "" : "none";
     elTabJogo.setAttribute("aria-pressed", String(jogo));
     elTabTop.setAttribute("aria-pressed", String(!jogo));
+    if(jogo) elDump.classList.remove("on");
     if(!jogo) paintBoard(null);
   }
 
@@ -328,8 +352,39 @@ body{
   elTabTop.addEventListener("click", function(){ show("top"); });
 
   document.addEventListener("keydown", function(e){
-    if(document.activeElement === elName) return;
+    if(document.activeElement === elName || document.activeElement === elDump) return;
     if(e.code === "Space"){ e.preventDefault(); elAct.click(); }
+  });
+
+  // ---- passar a lista deste telemovel para os outros ----
+  function listaTexto(){
+    if(!top.length) return "incarport · jogo do Caramulo\nEste telemóvel ainda não tem jogadas.";
+    var l = ["incarport · jogo do Caramulo",
+             "Lista deste telemóvel — " + top.length + (top.length === 1 ? " jogada" : " jogadas"),
+             ""];
+    for(var i=0;i<top.length;i++){
+      l.push((i+1) + ". " + top[i].nome + " — " + fmt(top[i].err) + " de erro");
+    }
+    return l.join("\n");
+  }
+
+  elDump.value = "";
+  $("verTudo").addEventListener("click", function(){
+    elDump.value = listaTexto();
+    elDump.classList.toggle("on");
+    if(elDump.classList.contains("on")){ elDump.focus(); elDump.select(); }
+  });
+
+  $("copiar").addEventListener("click", function(){
+    var txt = listaTexto();
+    function feito(){ elHint.innerHTML = "Lista copiada. <b>Cola no grupo</b>"; }
+    function falhou(){
+      elDump.value = txt; elDump.classList.add("on"); elDump.focus(); elDump.select();
+      elHint.innerHTML = "Copia o texto à mão";
+    }
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(txt).then(feito, falhou);
+    } else { falhou(); }
   });
 
   // tres toques seguidos no logotipo apagam o quadro (so para a equipa)
