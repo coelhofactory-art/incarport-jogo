@@ -1,0 +1,225 @@
+<title>Trava nos 5000</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,600;0,700;1,800;1,900&family=Inter:wght@500;600;700&display=swap">
+
+<style>
+:root{
+  --bg:#0B0D0E;
+  --panel:#14181A;
+  --cream:#EDE9E2;
+  --muted:#8D9498;
+  --accent:#E0362B;
+  --win:#37C97D;
+  --near:#F0A93B;
+  --display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --body:"Inter","Helvetica Neue",Arial,sans-serif;
+}
+*{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html,body{ height:100%; }
+body{
+  margin:0; background:var(--bg); color:var(--cream);
+  font-family:var(--body); overflow:hidden;
+  -webkit-font-smoothing:antialiased; user-select:none; -webkit-user-select:none;
+}
+#app{
+  position:fixed; inset:0; display:flex; flex-direction:column;
+  padding:max(18px,env(safe-area-inset-top)) 20px max(18px,env(safe-area-inset-bottom));
+}
+
+/* ---------- topo ---------- */
+.bar{ display:flex; align-items:center; justify-content:space-between; flex:0 0 auto; }
+.wm{
+  font-family:var(--display); font-style:italic; font-weight:900;
+  font-size:clamp(19px,5vw,26px); letter-spacing:-.03em;
+}
+.wm span{ color:var(--accent); }
+.best{
+  font-size:clamp(10px,2.6vw,12px); font-weight:700; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--muted); text-align:right; line-height:1.4;
+}
+.best b{ display:block; color:var(--cream); font-family:var(--display);
+         font-size:clamp(14px,3.6vw,18px); letter-spacing:-.01em;
+         font-variant-numeric:tabular-nums; }
+
+/* ---------- palco ---------- */
+.stage{
+  flex:1; display:flex; flex-direction:column; align-items:center;
+  justify-content:center; text-align:center; min-height:0; gap:clamp(6px,1.6vh,14px);
+}
+.target{
+  font-size:clamp(12px,3.2vw,15px); font-weight:700; letter-spacing:.2em;
+  text-transform:uppercase; color:var(--muted);
+}
+.target b{ color:var(--accent); }
+
+.num{
+  font-family:var(--display); font-style:italic; font-weight:900;
+  font-size:clamp(64px,20vw,150px); line-height:.9; letter-spacing:-.045em;
+  font-variant-numeric:tabular-nums; color:var(--cream);
+}
+.num.win{ color:var(--win); }
+.num.near{ color:var(--near); }
+.num.miss{ color:var(--accent); }
+
+.verdict{ min-height:clamp(52px,13vh,96px); display:flex; flex-direction:column;
+          justify-content:center; gap:6px; }
+.verdict .tier{
+  font-family:var(--display); font-style:italic; font-weight:900;
+  font-size:clamp(24px,7.4vw,44px); line-height:1; letter-spacing:-.03em;
+  text-transform:uppercase;
+}
+.verdict .tier.win{ color:var(--win); }
+.verdict .tier.near{ color:var(--near); }
+.verdict .tier.miss{ color:var(--cream); }
+.verdict .gap{
+  font-size:clamp(13px,3.4vw,17px); font-weight:600; color:var(--muted);
+}
+.verdict .gap b{ color:var(--cream); font-variant-numeric:tabular-nums; }
+
+/* ---------- botão ---------- */
+.act{
+  flex:0 0 auto; width:100%; border:0; border-radius:18px; cursor:pointer;
+  font-family:var(--display); font-style:italic; font-weight:900;
+  font-size:clamp(26px,7.6vw,40px); letter-spacing:-.02em; text-transform:uppercase;
+  padding:clamp(20px,4.4vh,34px) 20px; color:var(--bg); background:var(--cream);
+  transition:transform .06s ease, background .12s ease;
+}
+.act:active{ transform:scale(.985); }
+.act.stop{ background:var(--accent); color:#fff; }
+.act:focus-visible{ outline:3px solid var(--cream); outline-offset:3px; }
+
+.hint{
+  flex:0 0 auto; text-align:center; margin-top:12px;
+  font-size:clamp(11px,2.8vw,13px); font-weight:600; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--muted); min-height:16px;
+}
+.hint b{ color:var(--cream); }
+
+@media (prefers-reduced-motion: reduce){ .act{ transition:none; } }
+</style>
+
+<div id="app">
+  <div class="bar">
+    <div class="wm" id="wm">incarport<span>.</span></div>
+    <div class="best">Melhor do dia<b id="best">—</b></div>
+  </div>
+
+  <div class="stage">
+    <div class="target">Pára o contador nos <b>5 000 €</b></div>
+    <div class="num" id="num">0 €</div>
+    <div class="verdict" id="verdict">
+      <div class="tier miss" id="tier">Toca para começar</div>
+      <div class="gap" id="gap">É a poupança média de quem importa connosco.</div>
+    </div>
+  </div>
+
+  <button class="act" id="act" type="button">Começar</button>
+  <div class="hint" id="hint">Um jogo por pessoa</div>
+</div>
+
+<script>
+(function(){
+  var TARGET = 5000, MAX = 10000, PERIOD = 2600;   // ms por volta completa
+  var WIN = 150, NEAR = 600;                       // margens dos premios
+  var state = "idle", raf = null, t0 = 0, value = 0;
+
+  var elNum = document.getElementById("num"),
+      elTier = document.getElementById("tier"),
+      elGap = document.getElementById("gap"),
+      elAct = document.getElementById("act"),
+      elHint = document.getElementById("hint"),
+      elBest = document.getElementById("best");
+
+  var KEY = "incarport-jogo-melhor";
+  function readBest(){
+    try{ var v = localStorage.getItem(KEY); return v === null ? null : Number(v); }
+    catch(e){ return null; }
+  }
+  function writeBest(v){ try{ localStorage.setItem(KEY, String(v)); }catch(e){} }
+
+  var best = readBest();
+  function paintBest(){
+    elBest.textContent = best === null ? "—" : (best === 0 ? "certo!" : fmt(best) + " de erro");
+  }
+
+  function fmt(n){
+    return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " €";
+  }
+
+  // sobe ate MAX e volta a descer, para dar sempre hipotese de acertar
+  function tick(now){
+    var p = ((now - t0) % PERIOD) / PERIOD;
+    var tri = p < 0.5 ? p * 2 : (1 - p) * 2;
+    value = tri * MAX;
+    elNum.textContent = fmt(value);
+    raf = requestAnimationFrame(tick);
+  }
+
+  function start(){
+    state = "running";
+    elNum.className = "num";
+    elTier.className = "tier miss";
+    elTier.textContent = "Agora!";
+    elGap.innerHTML = "Carrega quando chegares aos 5 000 €.";
+    elAct.textContent = "Parar";
+    elAct.classList.add("stop");
+    elHint.innerHTML = "";
+    t0 = performance.now();
+    raf = requestAnimationFrame(tick);
+  }
+
+  function stop(){
+    state = "done";
+    cancelAnimationFrame(raf);
+    var v = Math.round(value);
+    var d = Math.abs(v - TARGET);
+    elNum.textContent = fmt(v);
+
+    var tier, cls, gap;
+    if(d <= WIN){       tier = "Prémio grande!";  cls = "win";
+      gap = d === 0 ? "Em cheio. Nos <b>5 000 €</b> certos." : "A <b>" + fmt(d) + "</b> do alvo."; }
+    else if(d <= NEAR){ tier = "Quase!";          cls = "near";
+      gap = "Falhaste por <b>" + fmt(d) + "</b>. Leva o prémio pequeno."; }
+    else {              tier = "Não foi desta";   cls = "miss";
+      gap = "Falhaste por <b>" + fmt(d) + "</b>. Mas levas na mesma uma lembrança."; }
+
+    elNum.classList.add(cls);
+    elTier.className = "tier " + cls;
+    elTier.textContent = tier;
+    elGap.innerHTML = gap;
+
+    if(best === null || d < best){ best = d; writeBest(best); paintBest(); }
+
+    elAct.textContent = "Jogar outra vez";
+    elAct.classList.remove("stop");
+    elHint.innerHTML = "5 000 € é a <b>poupança média</b> de quem importa connosco";
+  }
+
+  elAct.addEventListener("click", function(){
+    if(state === "running") stop(); else start();
+  });
+
+  // barra de espaco para quem usar um teclado ou apontador
+  document.addEventListener("keydown", function(e){
+    if(e.code === "Space" || e.code === "Enter"){ e.preventDefault(); elAct.click(); }
+  });
+
+  // tres toques seguidos no logotipo apagam o recorde do dia (so para a equipa)
+  var taps = [], wm = document.getElementById("wm");
+  wm.addEventListener("click", function(){
+    var now = Date.now();
+    taps.push(now);
+    taps = taps.filter(function(t){ return now - t < 1200; });
+    if(taps.length >= 3){
+      taps = [];
+      best = null;
+      try{ localStorage.removeItem(KEY); }catch(e){}
+      paintBest();
+      elHint.innerHTML = "Recorde do dia apagado";
+    }
+  });
+
+  paintBest();
+})();
+</script>
